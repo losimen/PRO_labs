@@ -300,19 +300,17 @@ public:
 
 Matrix<SIZE_N> FirstBraces(Matrix<SIZE_N> &Y3, Matrix<SIZE_N> &Y3_2,
                            Matrix<SIZE_N> &Y1, Matrix<SIZE_N> &Y1_T,
-                           Matrix<SIZE_N> &Y2, Matrix<SIZE_N> &Y2_T)
+                           Matrix<SIZE_N> &Y2, Matrix<SIZE_N> &Y2_T,
+                           long double a)
 {
-    long double a = (Y1_T * Y1)[0][0];
-
     Matrix<SIZE_N> result = Y3 + Y3_2 * a + Y2 * Y2_T;
     return result;
 }
 
 Matrix<SIZE_N> SecondBraces(Matrix<SIZE_N> &Y3, Matrix<SIZE_N> &Y3_3,
-                            Matrix<SIZE_N> &Y1, Matrix<SIZE_N> &Y1_T)
+                            Matrix<SIZE_N> &Y1, Matrix<SIZE_N> &Y1_T,
+                            long double a)
 {
-    long double a = (Y1_T * Y1)[0][0];
-
     Matrix<SIZE_N> result = Y3 * a + Y3_3;
     return result;
 }
@@ -323,6 +321,7 @@ int main()
     Phase1 phase1(4, 1, 3);
     Matrix<SIZE_N> Y1 = phase1.countY1();
     Matrix<SIZE_N> Y1_T = Y1.transpose();
+    long double a = (Y1_T * Y1)[0][0];
 
     Phase2 phase2(4, 1, 3);
     Matrix<SIZE_N> Y2 = phase2.countY2();
@@ -333,10 +332,8 @@ int main()
     Matrix<SIZE_N> Y3_2 = Y3 * Y3;
     Matrix<SIZE_N> Y3_3 = Y3_2 * Y3;
 
-    // print Y3, Y3_2, Y3_3
-    std::cout << "Y3" << std::endl;
-    Matrix<SIZE_N> firstBraces = FirstBraces(Y3, Y3_2, Y1, Y1_T, Y2, Y2_T);
-    Matrix<SIZE_N> secondBraces = SecondBraces(Y3, Y3_3, Y1, Y1_T);
+    Matrix<SIZE_N> firstBraces = FirstBraces(Y3, Y3_2, Y1, Y1_T, Y2, Y2_T, a);
+    Matrix<SIZE_N> secondBraces = SecondBraces(Y3, Y3_3, Y1, Y1_T, a);
 
     secondBraces = Y1_T * secondBraces;
     firstBraces = Y2_T * firstBraces;
