@@ -9,58 +9,37 @@ template <unsigned N>
 class Matrix
 {
 private:
-    typedef std::array<std::array<double, N>, N> TMatrix;
-    typedef std::array<double, N> TVector;
+    typedef std::array<std::array<long double, N>, N> TMatrix;
+    typedef std::array<long double, N> TVector;
     TMatrix m_matrix;
 
-public:
-    Matrix() = delete;
-    Matrix(unsigned rows, unsigned cols): rows(rows), cols(cols)
+    Matrix mul(Matrix &oth)
     {
-        m_matrix.fill(TVector());
-    }
+        std::cout << " Called matrix multiplication" << std::endl;
+        if (this->cols != oth.rows)
+            throw std::invalid_argument("m_matrix sizes are not equal");
 
-    TVector& operator[](unsigned index) {
-        return m_matrix[index];
-    }
+        Matrix<SIZE_N> result(this->rows, oth.cols);
 
-    unsigned rows;
-    unsigned cols;
-
-    unsigned size() const
-    {
-        return m_matrix.size();
-    }
-
-    Matrix transpose()
-    {
-        Matrix<SIZE_N> result(rows, cols);
-
-        for (unsigned i = 0; i < m_matrix.size(); ++i)
-            for (unsigned j = 0; j < m_matrix[i].size(); ++j)
-                result[i][j] = m_matrix[j][i];
+        for (size_t i = 0; i < rows; i++) {
+            for (size_t j = 0; j < oth.cols; j++) {
+                for (size_t k = 0; k < cols; k++) {
+                    result[i][j] += m_matrix[i][k] * oth.m_matrix[k][j];
+                }
+            }
+        }
 
         return result;
     }
 
-    Matrix mul(Matrix &oth)
+    Matrix mul(double oth)
     {
-        if (m_matrix.size() != oth[0].size())
-            throw std::invalid_argument("m_matrix sizes are not equal");
+        std::cout << " Called scalar multiplication" << std::endl;
+        Matrix<SIZE_N> result(this->rows, this->cols);
 
-        Matrix<SIZE_N> result(m_matrix.size(), oth[0].size());
-
-        for (unsigned i = 0; i < m_matrix.size(); ++i)
-        {
-            for (unsigned j = 0; j < m_matrix[i].size(); ++j)
-            {
-                double sum = 0;
-                for (unsigned k = 0; k < m_matrix[i].size(); ++k)
-                {
-                    sum += m_matrix[i][k] * oth[k][j];
-                }
-
-                result[i][j] = sum;
+        for (size_t i = 0; i < rows; i++) {
+            for (size_t j = 0; j < cols; j++) {
+                result[i][j] = m_matrix[i][j] * oth;
             }
         }
 
@@ -69,10 +48,10 @@ public:
 
     Matrix sub(Matrix &oth)
     {
-        if (m_matrix.size() != oth.size())
+        if (this->rows != oth.rows && this->cols != oth.cols)
             throw std::invalid_argument("m_matrix sizes are not equal");
 
-        Matrix<SIZE_N> result(m_matrix.size(), oth[0].size());
+        Matrix<SIZE_N> result(std::max(this->rows, oth.rows), std::max(this->cols, oth.cols));
 
         for (unsigned i = 0; i < m_matrix.size(); ++i)
         {
@@ -87,10 +66,10 @@ public:
 
     Matrix add(Matrix &oth)
     {
-        if (m_matrix.size() != oth.size())
+        if (this->rows != oth.rows && this->cols != oth.cols)
             throw std::invalid_argument("m_matrix sizes are not equal");
 
-        Matrix<SIZE_N> result(m_matrix.size(), oth[0].size());
+        Matrix<SIZE_N> result(std::max(this->rows, oth.rows), std::max(this->cols, oth.cols));
 
         for (unsigned i = 0; i < m_matrix.size(); ++i)
         {
@@ -102,14 +81,57 @@ public:
 
         return result;
     }
-
-    void printMatrix()
+public:
+    Matrix() = delete;
+    Matrix(unsigned rows, unsigned cols): rows(rows), cols(cols)
     {
+        m_matrix.fill(TVector());
+    }
+
+    TVector& operator[](unsigned index) {
+        return m_matrix[index];
+    }
+
+    unsigned rows;
+    unsigned cols;
+
+    Matrix transpose()
+    {
+        Matrix<SIZE_N> result(this->cols, this->rows);
+
+        for (unsigned i = 0; i < m_matrix.size(); ++i)
+            for (unsigned j = 0; j < m_matrix[i].size(); ++j)
+                result[i][j] = m_matrix[j][i];
+
+        return result;
+    }
+
+    template<typename T>
+    Matrix operator*(T &&oth)
+    {
+        return mul(oth);
+    }
+
+    template<typename T>
+    Matrix operator-(T &&oth)
+    {
+        return sub(oth);
+    }
+
+    template<typename T>
+    Matrix operator+(T &&oth)
+    {
+        return add(oth);
+    }
+
+    void print()
+    {
+        std::cout << std::fixed;
         for (unsigned i = 0; i < m_matrix.size(); ++i)
         {
             for (unsigned j = 0; j < m_matrix[i].size(); ++j)
             {
-                std::cout << std::setw(10) << std::setprecision(5) << m_matrix[i][j] << " ";
+                std::cout << std::setw(12) << std::setprecision(3) << m_matrix[i][j] << " ";
             }
             std::cout << std::endl;
         }
@@ -151,11 +173,11 @@ public:
     Matrix<SIZE_N> vectorColumnBi = Matrix<SIZE_N>(N, 1);
     Matrix<SIZE_N> A = Matrix<SIZE_N>(N, N);
 
-    explicit Phase1(int n)
+    explicit Phase1(int n, int start = 1, int end = 100)
             : N(n)
     {
         genBi(9);
-        genA();
+        genA(start, end);
     }
 
     Matrix<SIZE_N> countY1()
@@ -164,7 +186,7 @@ public:
 
         for (unsigned i = 0; i < N; ++i)
         {
-            double sum = 0;
+            long double sum = 0;
             for (unsigned j = 0; j < N; ++j)
             {
                 sum += A[i][j] * vectorColumnBi[i][0];
@@ -225,8 +247,8 @@ public:
     {
         Matrix<SIZE_N> result(N, 1);
 
-        result = vectorColumnBi.sub(vectorColumnCi);
-        result = A1.mul(result);
+        result = vectorColumnBi - vectorColumnCi;
+        result = A1 * result;
 
         return result;
     }
@@ -272,26 +294,45 @@ public:
 
     Matrix<SIZE_N> countY3()
     {
-        Matrix<SIZE_N> sub = B2.add(C2);
-        return A2.mul(sub);
+        Matrix<SIZE_N> sub = B2 + C2;
+        return A2 * sub;
     }
 };
 
 
+Matrix<SIZE_N> firstBraces(Matrix<SIZE_N> &Y3, Matrix<SIZE_N> &Y3_2,
+                           Matrix<SIZE_N> &Y1, Matrix<SIZE_N> &Y1_T,
+                           Matrix<SIZE_N> &Y2,  Matrix<SIZE_N> &Y2_T)
+{
+    long double a = (Y1_T * Y1)[0][0];
+
+    Matrix<SIZE_N> result = Y3 + Y3_2 * a + Y2 * Y2_T;
+    return result;
+}
+
+
 int main()
 {
-    Phase1 phase1(4);
+    Phase1 phase1(4, 1, 3);
     Matrix<SIZE_N> Y1 = phase1.countY1();
+    std::cout << "Y1" << std::endl;
+    Y1.print();
     Matrix<SIZE_N> Y1_T = Y1.transpose();
+    std::cout << "Y1_T" << std::endl;
+    Y1_T.print();
 
-    Phase2 phase2(4, 1, 100);
+    Phase2 phase2(4, 1, 3);
     Matrix<SIZE_N> Y2 = phase2.countY2();
     Matrix<SIZE_N> Y2_T = Y2.transpose();
 
-    Phase3 phase3(4, 1, 100);
+    Phase3 phase3(4, 1, 3);
     Matrix<SIZE_N> Y3 = phase3.countY3();
-    Matrix<SIZE_N> Y3_2 = Y3.mul(Y3);
-    Matrix<SIZE_N> Y3_3 = Y3_2.mul(Y3);
+    Matrix<SIZE_N> Y3_2 = Y3 * Y3;
+    Matrix<SIZE_N> Y3_3 = Y3_2 * Y3;
+
+    // print Y3, Y3_2, Y3_3
+    std::cout << "Y3" << std::endl;
+    firstBraces(Y3, Y3_2, Y1, Y1_T, Y2, Y2_T).print();
 
     return 0;
 }
