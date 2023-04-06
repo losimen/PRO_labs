@@ -2,16 +2,21 @@
 #include <iostream>
 #include <array>
 #include <iomanip>
+#include <map>
+#include <mpi.h>
 
 constexpr unsigned SIZE_N = 4;
+
+typedef long double CalVar;
+typedef std::array<std::array<CalVar, SIZE_N>, SIZE_N> TMatrix;
+typedef std::array<CalVar, SIZE_N> TVector;
+
 
 template <unsigned N>
 class Matrix
 {
 private:
-    typedef std::array<std::array<long double, N>, N> TMatrix;
-    typedef std::array<long double, N> TVector;
-    TMatrix m_matrix;
+    TMatrix m_matrix{};
 
     Matrix mul(Matrix &oth)
     {
@@ -31,7 +36,7 @@ private:
         return result;
     }
 
-    Matrix mul(double oth)
+    Matrix mul(CalVar oth)
     {
         Matrix<SIZE_N> result(this->rows, this->cols);
 
@@ -125,11 +130,11 @@ public:
     void print()
     {
         std::cout << std::fixed;
-        for (unsigned i = 0; i < m_matrix.size(); ++i)
+        for (auto & i : m_matrix)
         {
-            for (unsigned j = 0; j < m_matrix[i].size(); ++j)
+            for (long double j : i)
             {
-                std::cout << std::setw(12) << std::setprecision(3) << m_matrix[i][j] << " ";
+                std::cout << std::setw(12) << std::setprecision(3) << j << " ";
             }
             std::cout << std::endl;
         }
@@ -140,7 +145,7 @@ void randGenMatrix(Matrix<SIZE_N> &A, int N, int start = 1, int end = 100)
 {
     std::random_device rd;
     std::mt19937 mt(rd());
-    std::uniform_real_distribution<double> dist(start, end);
+    std::uniform_real_distribution<CalVar> dist(start, end);
 
     for (unsigned i = 0; i < N; ++i)
     {
@@ -155,7 +160,7 @@ void randGenColumnVector(Matrix<SIZE_N> &A, int N, int start = 1, int end = 100)
 {
     std::random_device rd;
     std::mt19937 mt(rd());
-    std::uniform_real_distribution<double> dist(start, end);
+    std::uniform_real_distribution<CalVar> dist(start, end);
 
     for (unsigned i = 0; i < N; ++i)
     {
@@ -184,7 +189,7 @@ public:
 
         for (unsigned i = 0; i < N; ++i)
         {
-            long double sum = 0;
+            CalVar sum = 0;
             for (unsigned j = 0; j < N; ++j)
             {
                 sum += A[i][j] * vectorColumnBi[i][0];
@@ -285,7 +290,7 @@ public:
         {
             for (int j = 0; j < N; ++j)
             {
-                C2[i][j] = 1 / (double)(i + j + 1);
+                C2[i][j] = 1 / (CalVar)(i + j + 1);
             }
         }
     }
@@ -301,7 +306,7 @@ public:
 Matrix<SIZE_N> FirstBraces(Matrix<SIZE_N> &Y3, Matrix<SIZE_N> &Y3_2,
                            Matrix<SIZE_N> &Y1, Matrix<SIZE_N> &Y1_T,
                            Matrix<SIZE_N> &Y2, Matrix<SIZE_N> &Y2_T,
-                           long double a)
+                           CalVar a)
 {
     Matrix<SIZE_N> result = Y3 + Y3_2 * a + Y2 * Y2_T;
     return result;
@@ -309,19 +314,19 @@ Matrix<SIZE_N> FirstBraces(Matrix<SIZE_N> &Y3, Matrix<SIZE_N> &Y3_2,
 
 Matrix<SIZE_N> SecondBraces(Matrix<SIZE_N> &Y3, Matrix<SIZE_N> &Y3_3,
                             Matrix<SIZE_N> &Y1, Matrix<SIZE_N> &Y1_T,
-                            long double a)
+                            CalVar a)
 {
     Matrix<SIZE_N> result = Y3 * a + Y3_3;
     return result;
 }
 
 
-int main()
+void countEquation()
 {
     Phase1 phase1(4, 1, 3);
     Matrix<SIZE_N> Y1 = phase1.countY1();
     Matrix<SIZE_N> Y1_T = Y1.transpose();
-    long double a = (Y1_T * Y1)[0][0];
+    CalVar a = (Y1_T * Y1)[0][0];
 
     Phase2 phase2(4, 1, 3);
     Matrix<SIZE_N> Y2 = phase2.countY2();
@@ -340,6 +345,88 @@ int main()
 
     auto final = secondBraces + firstBraces;
     final.print();
+}
 
+
+class Process
+{
+public:
+    static void sendMatrix(int rankToSend, const std::vector<CalVar>& vecToSend)
+    {
+        MPI_Send(vecToSend.data(), SIZE_N * SIZE_N, MPI_LONG_DOUBLE, rankToSend, 0,
+                 MPI_COMM_WORLD);
+    }
+
+    static std::array<CalVar, SIZE_N*SIZE_N> recvMatrix()
+    {
+        std::array<CalVar , SIZE_N*SIZE_N> recvMatrix{};
+        MPI_Status status;
+
+        MPI_Recv(recvMatrix.data(), SIZE_N * SIZE_N, MPI_LONG_DOUBLE,
+                 MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+
+        return recvMatrix;
+    }
+
+    static void serializeMatrix(Matrix<SIZE_N>& matrix, std::vector<CalVar>& vec)
+    {
+        for (int i = 0; i < SIZE_N; ++i)
+        {
+            for (int j = 0; j < SIZE_N; ++j)
+            {
+                vec.push_back(matrix[i][j]);
+            }
+        }
+    }
+
+    static void deserializeMatrix(Matrix<SIZE_N>& matrix, std::array<CalVar, SIZE_N*SIZE_N>& vec)
+    {
+        for (int i = 0; i < SIZE_N; ++i)
+        {
+            for (int j = 0; j < SIZE_N; ++j)
+            {
+                matrix[i][j] = vec[i * SIZE_N + j];
+            }
+        }
+    }
+};
+
+
+int main(int argc, char* argv[])
+{
+    const int PARENT_RANK = 0;
+
+    std::map<int, int> processCom = {
+            {0, 1},
+            {1, 0}
+    };
+
+    int procRank;
+
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &procRank);
+
+    if (procRank == PARENT_RANK)
+    {
+        Phase1 phase3(4, 1, 3);
+        std::cout << "Process " << procRank << std::endl;
+        phase3.A.print();
+        std::vector<CalVar> toSend;
+
+        Process::serializeMatrix(phase3.A, toSend);
+        Process::sendMatrix(processCom[procRank], toSend);
+
+        MPI_Finalize();
+        return 0;
+    }
+
+    Matrix<SIZE_N> matrix(4, 4);
+    auto recvVector = Process::recvMatrix();
+    Process::deserializeMatrix(matrix, recvVector);
+
+    std::cout << "Process " << procRank << std::endl;
+    matrix.print();
+
+    MPI_Finalize();
     return 0;
 }
