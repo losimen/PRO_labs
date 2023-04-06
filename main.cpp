@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <map>
 #include <mpi.h>
+#include <fstream>
 
 constexpr unsigned SIZE_N = 4;
 
@@ -137,6 +138,32 @@ public:
                 std::cout << std::setw(12) << std::setprecision(3) << j << " ";
             }
             std::cout << std::endl;
+        }
+    }
+
+    void writeToFile(const std::string &fileName)
+    {
+        std::ofstream file(fileName);
+        file << std::fixed;
+        for (auto & i : m_matrix)
+        {
+            for (long double j : i)
+            {
+                file << j << " ";
+            }
+            file << std::endl;
+        }
+    }
+
+    void readFromFile(const std::string &fileName)
+    {
+        std::ifstream file(fileName);
+        for (auto & i : m_matrix)
+        {
+            for (long double & j : i)
+            {
+                file >> j;
+            }
         }
     }
 };
@@ -489,16 +516,72 @@ void doThirdProcess(Phase3 &phase3)
 }
 
 
+void saveToFile()
+{
+    Phase1 phase1(4, 1, 3);
+    Phase2 phase2(4, 1, 3);
+    Phase3 phase3(4, 1, 3);
+
+    phase1.vectorColumnBi.writeToFile("vectorColumnBi_1.txt");
+    phase1.A.writeToFile("A.txt");
+
+    phase2.A1.writeToFile("A1.txt");
+    phase2.vectorColumnBi.writeToFile("vectorColumnBi_2.txt");
+    phase2.vectorColumnCi.writeToFile("vectorColumnCi.txt");
+
+    phase3.A2.writeToFile("A2.txt");
+    phase3.B2.writeToFile("B2.txt");
+    phase3.C2.writeToFile("C2.txt");
+}
+
+
+void readFromFile(Phase1 &phase1, Phase2 &phase2, Phase3 &phase3)
+{
+    phase1.vectorColumnBi.readFromFile("vectorColumnBi_1.txt");
+    phase1.vectorColumnBi.rows = 4;
+    phase1.vectorColumnBi.cols = 1;
+
+    phase1.A.readFromFile("A.txt");
+    phase1.A.rows = 4;
+    phase1.A.cols = 4;
+
+    phase2.A1.readFromFile("A1.txt");
+    phase2.A1.rows = 4;
+    phase2.A1.cols = 4;
+
+    phase2.vectorColumnBi.readFromFile("vectorColumnBi_2.txt");
+    phase2.vectorColumnBi.rows = 4;
+    phase2.vectorColumnBi.cols = 1;
+
+    phase2.vectorColumnCi.readFromFile("vectorColumnCi.txt");
+    phase2.vectorColumnCi.rows = 4;
+    phase2.vectorColumnCi.cols = 1;
+
+    phase3.A2.readFromFile("A2.txt");
+    phase3.A2.rows = 4;
+    phase3.A2.cols = 4;
+
+    phase3.B2.readFromFile("B2.txt");
+    phase3.B2.rows = 4;
+    phase3.B2.cols = 4;
+
+    phase3.C2.readFromFile("C2.txt");
+    phase3.C2.rows = 4;
+    phase3.C2.cols = 4;
+}
+
+
 int main(int argc, char* argv[])
 {
     int procRank;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &procRank);
-
     Phase1 phase1(4, 1, 3);
     Phase2 phase2(4, 1, 3);
     Phase3 phase3(4, 1, 3);
+
+    readFromFile(phase1, phase2, phase3);
 
     if (procRank == 0)
         doFirstProcess(phase1);
