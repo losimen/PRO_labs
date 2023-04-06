@@ -15,7 +15,6 @@ private:
 
     Matrix mul(Matrix &oth)
     {
-        std::cout << " Called matrix multiplication" << std::endl;
         if (this->cols != oth.rows)
             throw std::invalid_argument("m_matrix sizes are not equal");
 
@@ -34,7 +33,6 @@ private:
 
     Matrix mul(double oth)
     {
-        std::cout << " Called scalar multiplication" << std::endl;
         Matrix<SIZE_N> result(this->rows, this->cols);
 
         for (size_t i = 0; i < rows; i++) {
@@ -300,13 +298,22 @@ public:
 };
 
 
-Matrix<SIZE_N> firstBraces(Matrix<SIZE_N> &Y3, Matrix<SIZE_N> &Y3_2,
+Matrix<SIZE_N> FirstBraces(Matrix<SIZE_N> &Y3, Matrix<SIZE_N> &Y3_2,
                            Matrix<SIZE_N> &Y1, Matrix<SIZE_N> &Y1_T,
-                           Matrix<SIZE_N> &Y2,  Matrix<SIZE_N> &Y2_T)
+                           Matrix<SIZE_N> &Y2, Matrix<SIZE_N> &Y2_T)
 {
     long double a = (Y1_T * Y1)[0][0];
 
     Matrix<SIZE_N> result = Y3 + Y3_2 * a + Y2 * Y2_T;
+    return result;
+}
+
+Matrix<SIZE_N> SecondBraces(Matrix<SIZE_N> &Y3, Matrix<SIZE_N> &Y3_3,
+                            Matrix<SIZE_N> &Y1, Matrix<SIZE_N> &Y1_T)
+{
+    long double a = (Y1_T * Y1)[0][0];
+
+    Matrix<SIZE_N> result = Y3 * a + Y3_3;
     return result;
 }
 
@@ -315,11 +322,7 @@ int main()
 {
     Phase1 phase1(4, 1, 3);
     Matrix<SIZE_N> Y1 = phase1.countY1();
-    std::cout << "Y1" << std::endl;
-    Y1.print();
     Matrix<SIZE_N> Y1_T = Y1.transpose();
-    std::cout << "Y1_T" << std::endl;
-    Y1_T.print();
 
     Phase2 phase2(4, 1, 3);
     Matrix<SIZE_N> Y2 = phase2.countY2();
@@ -332,7 +335,14 @@ int main()
 
     // print Y3, Y3_2, Y3_3
     std::cout << "Y3" << std::endl;
-    firstBraces(Y3, Y3_2, Y1, Y1_T, Y2, Y2_T).print();
+    Matrix<SIZE_N> firstBraces = FirstBraces(Y3, Y3_2, Y1, Y1_T, Y2, Y2_T);
+    Matrix<SIZE_N> secondBraces = SecondBraces(Y3, Y3_3, Y1, Y1_T);
+
+    secondBraces = Y1_T * secondBraces;
+    firstBraces = Y2_T * firstBraces;
+
+    auto final = secondBraces + firstBraces;
+    final.print();
 
     return 0;
 }
