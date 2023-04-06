@@ -350,31 +350,14 @@ void countEquation()
 
 class Process
 {
-public:
-    static void sendMatrix(int rankToSend, const std::vector<CalVar>& vecToSend)
-    {
-        MPI_Send(vecToSend.data(), SIZE_N * SIZE_N, MPI_LONG_DOUBLE, rankToSend, 0,
-                 MPI_COMM_WORLD);
-    }
-
-    static std::array<CalVar, SIZE_N*SIZE_N> recvMatrix()
-    {
-        std::array<CalVar , SIZE_N*SIZE_N> recvMatrix{};
-        MPI_Status status;
-
-        MPI_Recv(recvMatrix.data(), SIZE_N * SIZE_N, MPI_LONG_DOUBLE,
-                 MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-
-        return recvMatrix;
-    }
-
+private:
     static void serializeMatrix(Matrix<SIZE_N>& matrix, std::vector<CalVar>& vec)
     {
         for (int i = 0; i < SIZE_N; ++i)
         {
             for (int j = 0; j < SIZE_N; ++j)
             {
-                vec.push_back(matrix[i][j]);
+                vec[i*SIZE_N + j] = matrix[i][j];
             }
         }
     }
@@ -388,6 +371,30 @@ public:
                 matrix[i][j] = vec[i * SIZE_N + j];
             }
         }
+    }
+
+
+public:
+    static void sendMatrix(int rankToSend, Matrix<SIZE_N>& matrix)
+    {
+        std::vector<CalVar> vecToSend(SIZE_N * SIZE_N);
+        Process::serializeMatrix(matrix, vecToSend);
+
+        MPI_Send(vecToSend.data(), SIZE_N * SIZE_N, MPI_LONG_DOUBLE, rankToSend, 0,
+                 MPI_COMM_WORLD);
+    }
+
+    static Matrix<SIZE_N> recvMatrix()
+    {
+        Matrix<SIZE_N> matrix(4, 4);
+        std::array<CalVar , SIZE_N*SIZE_N> recvMatrix{};
+        MPI_Status status;
+
+        MPI_Recv(recvMatrix.data(), SIZE_N * SIZE_N, MPI_LONG_DOUBLE,
+                 MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+
+        deserializeMatrix(matrix, recvMatrix);
+        return matrix;
     }
 };
 
@@ -411,21 +418,16 @@ int main(int argc, char* argv[])
         Phase1 phase3(4, 1, 3);
         std::cout << "Process " << procRank << std::endl;
         phase3.A.print();
-        std::vector<CalVar> toSend;
 
-        Process::serializeMatrix(phase3.A, toSend);
-        Process::sendMatrix(processCom[procRank], toSend);
+        Process::sendMatrix(processCom[procRank], phase3.A);
 
         MPI_Finalize();
         return 0;
     }
 
-    Matrix<SIZE_N> matrix(4, 4);
     auto recvVector = Process::recvMatrix();
-    Process::deserializeMatrix(matrix, recvVector);
-
     std::cout << "Process " << procRank << std::endl;
-    matrix.print();
+    recvVector.print();
 
     MPI_Finalize();
     return 0;
