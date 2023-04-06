@@ -303,51 +303,6 @@ public:
 };
 
 
-Matrix<SIZE_N> FirstBraces(Matrix<SIZE_N> &Y3, Matrix<SIZE_N> &Y3_2,
-                           Matrix<SIZE_N> &Y1, Matrix<SIZE_N> &Y1_T,
-                           Matrix<SIZE_N> &Y2, Matrix<SIZE_N> &Y2_T,
-                           CalVar a)
-{
-    Matrix<SIZE_N> result = Y3 + Y3_2 * a + Y2 * Y2_T;
-    return result;
-}
-
-Matrix<SIZE_N> SecondBraces(Matrix<SIZE_N> &Y3, Matrix<SIZE_N> &Y3_3,
-                            Matrix<SIZE_N> &Y1, Matrix<SIZE_N> &Y1_T,
-                            CalVar a)
-{
-    Matrix<SIZE_N> result = Y3 * a + Y3_3;
-    return result;
-}
-
-
-void countEquation()
-{
-    Phase1 phase1(4, 1, 3);
-    Matrix<SIZE_N> Y1 = phase1.countY1();
-    Matrix<SIZE_N> Y1_T = Y1.transpose();
-    CalVar a = (Y1_T * Y1)[0][0];
-
-    Phase2 phase2(4, 1, 3);
-    Matrix<SIZE_N> Y2 = phase2.countY2();
-    Matrix<SIZE_N> Y2_T = Y2.transpose();
-
-    Phase3 phase3(4, 1, 3);
-    Matrix<SIZE_N> Y3 = phase3.countY3();
-    Matrix<SIZE_N> Y3_2 = Y3 * Y3;
-    Matrix<SIZE_N> Y3_3 = Y3_2 * Y3;
-
-    Matrix<SIZE_N> firstBraces = FirstBraces(Y3, Y3_2, Y1, Y1_T, Y2, Y2_T, a);
-    Matrix<SIZE_N> secondBraces = SecondBraces(Y3, Y3_3, Y1, Y1_T, a);
-
-    secondBraces = Y1_T * secondBraces;
-    firstBraces = Y2_T * firstBraces;
-
-    auto final = secondBraces + firstBraces;
-    final.print();
-}
-
-
 class Process
 {
 private:
@@ -384,14 +339,14 @@ public:
                  MPI_COMM_WORLD);
     }
 
-    static Matrix<SIZE_N> recvMatrix()
+    static Matrix<SIZE_N> recvMatrix(int recvFrom)
     {
         Matrix<SIZE_N> matrix(4, 4);
         std::array<CalVar , SIZE_N*SIZE_N> recvMatrix{};
         MPI_Status status;
 
         MPI_Recv(recvMatrix.data(), SIZE_N * SIZE_N, MPI_LONG_DOUBLE,
-                 MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+                 recvFrom, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
         deserializeMatrix(matrix, recvMatrix);
         return matrix;
@@ -403,15 +358,21 @@ public:
                  MPI_COMM_WORLD);
     }
 
-    static std::array<CalVar, SIZE_N> recvVector()
+    static Matrix<SIZE_N> recvVector(int recvFrom)
     {
-        std::array<CalVar, SIZE_N> vec {};
+        std::array<CalVar , SIZE_N> rec{};
         MPI_Status status;
 
-        MPI_Recv(vec.data(), SIZE_N, MPI_LONG_DOUBLE,
-                 MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+        MPI_Recv(rec.data(), SIZE_N, MPI_LONG_DOUBLE,
+                 recvFrom, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
-        return vec;
+        Matrix<SIZE_N> matrix(1, 4);
+        for (int i = 0; i < SIZE_N; ++i)
+        {
+            matrix[0][i] = rec[i];
+        }
+
+        return matrix;
     }
 
     static void sendScalar(int rankToSend, CalVar scalar)
@@ -420,48 +381,133 @@ public:
                  MPI_COMM_WORLD);
     }
 
-    static CalVar recvScalar()
+    static CalVar recvScalar(int recvFrom)
     {
         CalVar scalar;
         MPI_Status status;
 
         MPI_Recv(&scalar, 1, MPI_LONG_DOUBLE,
-                 MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+                 recvFrom, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
         return scalar;
     }
 };
 
 
+Matrix<SIZE_N> FirstBraces(Matrix<SIZE_N> &Y3, Matrix<SIZE_N> &Y3_2,
+                           Matrix<SIZE_N> &Y1, Matrix<SIZE_N> &Y1_T,
+                           Matrix<SIZE_N> &Y2, Matrix<SIZE_N> &Y2_T,
+                           CalVar a)
+{
+    Matrix<SIZE_N> result = Y3 + Y3_2 * a + Y2 * Y2_T;
+    return result;
+}
+
+Matrix<SIZE_N> SecondBraces(Matrix<SIZE_N> &Y3, Matrix<SIZE_N> &Y3_3, CalVar a)
+{
+    Matrix<SIZE_N> result = Y3 * a + Y3_3;
+    return result;
+}
+
+
+void countEquation(Phase1 &phase1, Phase2 &phase2, Phase3 &phase3)
+{
+    Matrix<SIZE_N> Y1 = phase1.countY1();
+    Matrix<SIZE_N> Y1_T = Y1.transpose();
+    CalVar a = (Y1_T * Y1)[0][0];
+
+    Matrix<SIZE_N> Y2 = phase2.countY2();
+    Matrix<SIZE_N> Y2_T = Y2.transpose();
+
+    Matrix<SIZE_N> Y3 = phase3.countY3();
+    Matrix<SIZE_N> Y3_2 = Y3 * Y3;
+    Matrix<SIZE_N> Y3_3 = Y3_2 * Y3;
+
+    Matrix<SIZE_N> firstBraces = FirstBraces(Y3, Y3_2, Y1, Y1_T, Y2, Y2_T, a);
+    Matrix<SIZE_N> secondBraces = SecondBraces(Y3, Y3_3, a);
+
+    secondBraces = Y1_T * secondBraces;
+    firstBraces = Y2_T * firstBraces;
+
+    auto final = secondBraces + firstBraces;
+    std::cout << "Final result one process: " << std::endl;
+    final.print();
+}
+
+
+void doFirstProcess(Phase1 &phase1)
+{
+    Matrix<SIZE_N> Y1 = phase1.countY1();
+    Matrix<SIZE_N> Y1_T = Y1.transpose();
+    CalVar a = (Y1_T * Y1)[0][0];
+
+    Process::sendScalar(1, a);
+    Matrix<SIZE_N> Y3 = Process::recvMatrix(2);
+    Matrix<SIZE_N> Y3_3 = Process::recvMatrix(2);
+    Matrix<SIZE_N> Y3_Mul_a = Y3 * a + Y3_3;
+
+    Matrix<SIZE_N> Y1_T_Mul_Y3_Mul_a_Plus_Y3_3 = Y1_T * Y3_Mul_a;
+
+    Process::sendVector(1, Y1_T_Mul_Y3_Mul_a_Plus_Y3_3[0]);
+}
+
+void doSecondProcess(Phase2 &phase2)
+{
+    Matrix<SIZE_N> Y2 = phase2.countY2();
+    Matrix<SIZE_N> Y2_T = Y2.transpose();
+
+    // matrix
+    Matrix<SIZE_N> Y2_Mul_Y2_T = Y2 * Y2_T;
+
+    CalVar a = Process::recvScalar(0);
+    Matrix<SIZE_N> Y3_2 = Process::recvMatrix(2);
+
+    Matrix<SIZE_N> Y3_2_Mul_a = Y3_2 * a;
+    Matrix<SIZE_N> Y3_2_Mul_a_Plus_Y2_Mul_Y2_T = Y3_2_Mul_a + Y2_Mul_Y2_T;
+
+    Matrix<SIZE_N> Y3 = Process::recvMatrix(2);
+    Matrix<SIZE_N> Y3_2_Mul_a_Plus_Y2_Mul_Y2_T_Plus_Y3 = Y3_2_Mul_a_Plus_Y2_Mul_Y2_T + Y3;
+    Matrix<SIZE_N> fin = Y2_T * Y3_2_Mul_a_Plus_Y2_Mul_Y2_T_Plus_Y3;
+
+    Matrix<SIZE_N> recived = Process::recvVector(0);
+
+    std::cout << "Final result two process: " << std::endl;
+    (fin + recived).print();
+}
+
+void doThirdProcess(Phase3 &phase3)
+{
+    Matrix<SIZE_N> Y3 = phase3.countY3();
+    Process::sendMatrix(0, Y3);
+
+    Matrix<SIZE_N> Y3_2 = Y3 * Y3;
+    Process::sendMatrix(1, Y3_2);
+
+    Matrix<SIZE_N> Y3_3 = Y3_2 * Y3;
+    Process::sendMatrix(0, Y3_3);
+    Process::sendMatrix(1, Y3);
+}
+
+
 int main(int argc, char* argv[])
 {
-    const int PARENT_RANK = 0;
-
-    std::map<int, int> processCom = {
-            {0, 1},
-            {1, 0}
-    };
-
     int procRank;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &procRank);
 
-    if (procRank == PARENT_RANK)
-    {
-        Phase1 phase3(4, 1, 3);
-        std::cout << "Process " << procRank << std::endl;
-        phase3.A.print();
+    Phase1 phase1(4, 1, 3);
+    Phase2 phase2(4, 1, 3);
+    Phase3 phase3(4, 1, 3);
 
-        Process::sendMatrix(processCom[procRank], phase3.A);
-
-        MPI_Finalize();
-        return 0;
-    }
-
-    auto recvVector = Process::recvMatrix();
-    std::cout << "Process " << procRank << std::endl;
-    recvVector.print();
+    if (procRank == 0)
+        doFirstProcess(phase1);
+    else if (procRank == 1)
+        doSecondProcess(phase2);
+    else if (procRank == 2)
+        doThirdProcess(phase3);
+    else
+        countEquation(phase1, phase2, phase3);
 
     MPI_Finalize();
     return 0;
