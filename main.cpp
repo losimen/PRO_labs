@@ -498,7 +498,7 @@ void doSecondProcess(Phase2 &phase2)
 
     Matrix<SIZE_N> recived = Process::recvVector(0);
 
-    std::cout << "Final result two process: " << std::endl;
+    std::cout << "Final result three process: " << std::endl;
     (fin + recived).print();
 }
 
