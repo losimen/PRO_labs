@@ -396,6 +396,40 @@ public:
         deserializeMatrix(matrix, recvMatrix);
         return matrix;
     }
+
+    static void sendVector(int rankToSend, std::array<CalVar, SIZE_N>& vec)
+    {
+        MPI_Send(vec.data(), SIZE_N, MPI_LONG_DOUBLE, rankToSend, 0,
+                 MPI_COMM_WORLD);
+    }
+
+    static std::array<CalVar, SIZE_N> recvVector()
+    {
+        std::array<CalVar, SIZE_N> vec {};
+        MPI_Status status;
+
+        MPI_Recv(vec.data(), SIZE_N, MPI_LONG_DOUBLE,
+                 MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+
+        return vec;
+    }
+
+    static void sendScalar(int rankToSend, CalVar scalar)
+    {
+        MPI_Send(&scalar, 1, MPI_LONG_DOUBLE, rankToSend, 0,
+                 MPI_COMM_WORLD);
+    }
+
+    static CalVar recvScalar()
+    {
+        CalVar scalar;
+        MPI_Status status;
+
+        MPI_Recv(&scalar, 1, MPI_LONG_DOUBLE,
+                 MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+
+        return scalar;
+    }
 };
 
 
