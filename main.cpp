@@ -134,7 +134,7 @@ public:
         {
             for (long double j : i)
             {
-                std::cout << std::setw(12) << std::setprecision(0) << j << " ";
+                std::cout << std::setw(4) << std::setprecision(0) << j << " ";
             }
             std::cout << std::endl;
         }
@@ -184,14 +184,21 @@ void randGenMatrix(Matrix<SIZE_N> &A, int N, int start = 1, int end = 100)
 
 void genMatrixA(Matrix<SIZE_N> &A)
 {
-    for (unsigned i = 0; i < SIZE_N; ++i)
-    {
-        for (unsigned j = 0; j < SIZE_N; ++j)
-        {
-            if (j < SIZE_N - i)
-                A[i][j] = i + 1;
-            else
-                A[i][j] = 0;
+    for(int i = 0; i < SIZE_N; i++) {
+        for(int j = 0; j < SIZE_N; j++) {
+            if(i < SIZE_N / 2)
+            {
+                if(j < i || j >= SIZE_N - i)
+                    A[i][j] = 0;
+                else
+                    A[i][j] = 1;
+            }
+            else {
+                if(j < SIZE_N - i - 1 || j > i)
+                    A[i][j] = 0;
+                else
+                    A[i][j] = 1;
+            }
         }
     }
 }
