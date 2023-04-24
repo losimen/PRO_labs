@@ -134,7 +134,7 @@ public:
         {
             for (long double j : i)
             {
-                std::cout << std::setw(4) << std::setprecision(0) << j << " ";
+                std::cout << std::setw(12) << std::setprecision(3) << j << " ";
             }
             std::cout << std::endl;
         }
@@ -167,44 +167,56 @@ public:
     }
 };
 
-void randGenMatrix(Matrix<SIZE_N> &A, int N, int start = 1, int end = 100)
+CalVar randGenNumber(int start = 1, int end = 100)
 {
     std::random_device rd;
     std::mt19937 mt(rd());
     std::uniform_real_distribution<CalVar> dist(start, end);
 
-    for (unsigned i = 0; i < N; ++i)
-    {
-        for (unsigned j = 0; j < N; ++j)
-        {
-            A[i][j] = dist(mt);
-        }
-    }
+    return dist(mt);
 }
 
-void genMatrixA(Matrix<SIZE_N> &A)
+void genMatrixB(Matrix<SIZE_N> &B)
 {
     for(int i = 0; i < SIZE_N; i++) {
         for(int j = 0; j < SIZE_N; j++) {
             if(i < SIZE_N / 2)
             {
                 if(j < i || j >= SIZE_N - i)
-                    A[i][j] = 0;
+                    B[i][j] = 0;
                 else
-                    A[i][j] = 1;
+                    B[i][j] = randGenNumber(1, 100);
             }
             else {
                 if(j < SIZE_N - i - 1 || j > i)
-                    A[i][j] = 0;
+                    B[i][j] = 0;
                 else
-                    A[i][j] = 1;
+                    B[i][j] = randGenNumber(1, 100);
             }
         }
     }
 }
 
+
+void genMatrixA(Matrix<SIZE_N> &A)
+{
+    for(int i = 0; i < SIZE_N; i++) {
+        for(int j = 0; j < SIZE_N; j++) {
+            if(j < SIZE_N - i)
+                A[i][j] = i + 1;
+            else
+                A[i][j] = 0;
+        }
+    }
+}
+
+
 int main()
 {
+    Matrix<SIZE_N> B(SIZE_N, SIZE_N);
+    genMatrixB(B);
+    B.print();
+
     Matrix<SIZE_N> A(SIZE_N, SIZE_N);
     genMatrixA(A);
     A.print();
