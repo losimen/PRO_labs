@@ -1,9 +1,7 @@
 #include <random>
 #include <iostream>
-#include <array>
 #include <iomanip>
-#include <map>
-#include <fstream>
+#include <vector>
 
 unsigned SIZE_N = 10;
 
@@ -195,11 +193,11 @@ int main()
     TParallelMatrix resultStandard = mulStandard(A, B);
     TParallelMatrix resultParallel = mulOptimised(A, B);
 
-//    std::cout << std::endl << "Result standard:" << std::endl;
-//    printParallelMatrix(resultStandard);
-//
-//    std::cout << std::endl << "Result parallel:" << std::endl;
-//    printParallelMatrix(resultParallel);
+    std::cout << std::endl << "Result standard:" << std::endl;
+    printParallelMatrix(resultStandard);
+
+    std::cout << std::endl << "Result parallel:" << std::endl;
+    printParallelMatrix(resultParallel);
 
     return 0;
 }
