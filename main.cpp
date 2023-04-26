@@ -3,7 +3,7 @@
 #include <iomanip>
 #include <vector>
 
-unsigned SIZE_N = 10;
+unsigned SIZE_N = 4;
 
 typedef long double CalVar;
 typedef std::vector<CalVar> TVector;
@@ -174,6 +174,69 @@ TParallelMatrix mulOptimised(TMatrix &matrix1, TMatrix &matrix2)
 }
 
 
+unsigned mulOptimisedRecursive(TParallelMatrix &result, TMatrix &matrix1, TMatrix &matrix2)
+{
+    static unsigned numberOfOperations = 0;
+
+    static unsigned i = 0;
+    static unsigned j = 0;
+    static unsigned k = 0;
+
+    if (i < SIZE_N)
+    {
+        if (j < SIZE_N)
+        {
+            result[i][j][0] = 0;
+            if (k < SIZE_N)
+            {
+                if ( k >= SIZE_N - 1 )
+                {
+                    result[i][j][k+1] = result[i][j][k];
+                    k++;
+                    mulOptimisedRecursive(result, matrix1, matrix2);
+                    return 0;
+                }
+
+                if ( k < SIZE_N / 2)
+                {
+                    if( j < k || j >= SIZE_N - k )
+                    {
+                        result[i][j][k+1] = result[i][j][k];
+                        k++;
+                        mulOptimisedRecursive(result, matrix1, matrix2);
+                        return 0;
+                    }
+                }
+                else
+                {
+                    if ( j < SIZE_N - k - 1 || j > k)
+                    {
+                        result[i][j][k+1] = result[i][j][k];
+                        k++;
+                        mulOptimisedRecursive(result, matrix1, matrix2);
+                        return 0;
+                    }
+                }
+
+                result[i][j][k+1] = result[i][j][k] + matrix1[i][k] * matrix2[k][j];
+                numberOfOperations += 2;
+                k++;
+                mulOptimisedRecursive(result, matrix1, matrix2);
+            }
+            k = 0;
+            j++;
+            mulOptimisedRecursive(result, matrix1, matrix2);
+        }
+        j = 0;
+        i++;
+        mulOptimisedRecursive(result, matrix1, matrix2);
+    }
+
+    return numberOfOperations;
+}
+
+
+
 int main()
 {
     TMatrix B;
@@ -191,13 +254,19 @@ int main()
 //    printMatrix(A);
 
     TParallelMatrix resultStandard = mulStandard(A, B);
-    TParallelMatrix resultParallel = mulOptimised(A, B);
+//    TParallelMatrix resultParallel = mulOptimised(A, B);
+
+    TParallelMatrix resultParallelRecursive;
+    initParallelMatrix(resultParallelRecursive);
+    unsigned numberOfOperationsRecursive = mulOptimisedRecursive(resultParallelRecursive, A, B);
 
     std::cout << std::endl << "Result standard:" << std::endl;
     printParallelMatrix(resultStandard);
 
-    std::cout << std::endl << "Result parallel:" << std::endl;
-    printParallelMatrix(resultParallel);
+
+    std::cout << std::endl << "Result parallel: " << std::endl;
+    printParallelMatrix(resultParallelRecursive);
+    std::cout << "Number of operations recursive: " << numberOfOperationsRecursive << std::endl;
 
     return 0;
 }
