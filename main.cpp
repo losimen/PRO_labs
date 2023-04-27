@@ -3,7 +3,7 @@
 #include <iomanip>
 #include <vector>
 
-unsigned SIZE_N = 4;
+unsigned SIZE_N = 10;
 
 typedef long double CalVar;
 typedef std::vector<CalVar> TVector;
@@ -105,11 +105,8 @@ void printParallelMatrix(TParallelMatrix &matrix)
 }
 
 
-TParallelMatrix mulStandard(TMatrix &matrix1, TMatrix &matrix2)
+unsigned mulStandard(TParallelMatrix &result, TMatrix &matrix1, TMatrix &matrix2)
 {
-    TParallelMatrix result;
-    initParallelMatrix(result);
-
     unsigned numberOfOperations = 0;
 
     for (size_t i = 0; i < SIZE_N; i++) {
@@ -122,55 +119,7 @@ TParallelMatrix mulStandard(TMatrix &matrix1, TMatrix &matrix2)
         }
     }
 
-    std::cout << "Number of operations standard: " << numberOfOperations << std::endl;
-
-    return result;
-}
-
-
-TParallelMatrix mulOptimised(TMatrix &matrix1, TMatrix &matrix2)
-{
-    TParallelMatrix result;
-    initParallelMatrix(result);
-
-    unsigned numberOfOperations = 0;
-
-    for (size_t i = 0; i < SIZE_N; i++) {
-        for (size_t j = 0; j < SIZE_N; j++) {
-            result[i][j][0] = 0;
-            for (size_t k = 0; k < SIZE_N; k++) {
-                if (k >= SIZE_N - 1)
-                {
-                    result[i][j][k+1] = result[i][j][k];
-                    continue;
-                }
-
-                if ( k < SIZE_N / 2)
-                {
-                    if(j < k || j >= SIZE_N - k)
-                    {
-                        result[i][j][k+1] = result[i][j][k];
-                        continue;
-                    }
-                }
-                else
-                {
-                    if ( j < SIZE_N - k - 1 || j > k)
-                    {
-                        result[i][j][k+1] = result[i][j][k];
-                        continue;
-                    }
-                }
-
-                result[i][j][k+1] = result[i][j][k] + matrix1[i][k] * matrix2[k][j];
-                numberOfOperations += 2;
-            }
-        }
-    }
-
-    std::cout << "Number of operations optimised: " << numberOfOperations << std::endl;
-
-    return result;
+    return numberOfOperations;
 }
 
 
@@ -243,18 +192,13 @@ int main()
     initMatrix(B);
     genMatrixB(B);
 
-//    std::cout << "Matrix B:" << std::endl;
-//    printMatrix(B);
-
     TMatrix A;
     initMatrix(A);
     genMatrixA(A);
 
-//    std::cout << std::endl << "Matrix A:" << std::endl;
-//    printMatrix(A);
-
-    TParallelMatrix resultStandard = mulStandard(A, B);
-//    TParallelMatrix resultParallel = mulOptimised(A, B);
+    TParallelMatrix resultStandard;
+    initParallelMatrix(resultStandard);
+    unsigned numberOfOperationsStandard = mulStandard(resultStandard,A, B);
 
     TParallelMatrix resultParallelRecursive;
     initParallelMatrix(resultParallelRecursive);
@@ -262,6 +206,7 @@ int main()
 
     std::cout << std::endl << "Result standard:" << std::endl;
     printParallelMatrix(resultStandard);
+    std::cout << "Number of operations standard: " << numberOfOperationsStandard << std::endl;
 
 
     std::cout << std::endl << "Result parallel: " << std::endl;
