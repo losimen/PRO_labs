@@ -82,7 +82,7 @@ public:
         result[1] = _rows;
         result[2] = _cols;
 
-        int index = 1;
+        int index = 3;
         for(int i = 0; i < _rows; i++)
             for(int j = 0; j < _cols; j++)
                 result[index++] = _matrix[i][j];
@@ -90,7 +90,7 @@ public:
         return result;
     }
 
-    void setData(CalVar *data)
+    void data(CalVar *data)
     {
         _flag = data[0];
         _rows = data[1];
@@ -104,6 +104,16 @@ public:
         for(int i = 0; i < _rows; i++)
             for(int j = 0; j < _cols; j++)
                 _matrix[i][j] = data[index++];
+    }
+
+    void print()
+    {
+        for (int i = 0; i < _rows; i++)
+        {
+            for (int j = 0; j < _cols; j++)
+                std::cout << std::setw(5) << _matrix[i][j] << " ";
+            std::cout << std::endl;
+        }
     }
 };
 
@@ -188,7 +198,10 @@ public:
                 rowsLeft--;
             }
 
-            result.push_back(SharedMatrix(end - start, _cols, i));
+            auto newM = SharedMatrix(end - start, _cols, i);
+            newM.matrix() = TMatrix(_matrix.begin() + start, _matrix.begin() + end);
+            result.push_back(newM);
+
             start = end;
             end += rowsPerPart;
         }
@@ -228,25 +241,38 @@ class ProcessCommunicator
 {
 private:
     int _currentRank;
-    int _nextRank;
 
 public:
     ProcessCommunicator(int currentRank)
     {
         this->_currentRank = currentRank;
-        this->_nextRank = communicationData[currentRank];
     }
 
     void send(int rankToSend, CalVar *data)
     {
         const int size = 3 + (data[1] * data[2]);
         MPI_Send(data, size, MPI_DOUBLE, rankToSend, 0, MPI_COMM_WORLD);
+
+        delete[] data;
     }
 
-    void recv(int recvFrom)
+    SharedMatrix recv(int recvFrom)
     {
+        MPI_Status status;
+        MPI_Probe(recvFrom, 0, MPI_COMM_WORLD, &status);
 
+        int size;
+        MPI_Get_count(&status, MPI_DOUBLE, &size);
+
+        CalVar *data = new CalVar[size];
         MPI_Recv(data, size, MPI_DOUBLE, recvFrom, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+        SharedMatrix matrix;
+        matrix.data(data);
+
+        delete[] data;
+
+        return matrix;
     }
 };
 
@@ -317,5 +343,27 @@ int main(int argc, char* argv[])
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &procRank);
 
+    if (procRank == 0)
+    {
+        Matrix matrixA(60, 3);
+        genMatrix(matrixA);
+        ProcessCommunicator comm(procRank);
+
+        SMVec shared = matrixA.splitIntoMatricesRow(2);
+
+        std::cout << "Send [" << shared[1].flag() << "] " << shared[1].rows() << "|" << shared[1].cols() << " " << std::endl;
+        shared[1].print();
+        comm.send(1, shared[1].data());
+    }
+    else if (procRank == 1)
+    {
+        ProcessCommunicator comm(procRank);
+        auto matrix = comm.recv(0);
+
+        std::cout << std::endl << "Recv [" << matrix.flag() << "] " << matrix.rows() << "|" << matrix.cols() << " " << std::endl;
+        matrix.print();
+    }
+
+    MPI_Finalize();
     return 0;
 }
