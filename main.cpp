@@ -346,14 +346,24 @@ void jobRank0(int procRank)
     genMatrix(matrixB);
 
     auto vecSM_A = matrixA.splitIntoMatricesRow(8);
-//    auto vecSM_B = matrixB.splitIntoMatricesCol(8);
+    auto vecSM_B = matrixB.splitIntoMatricesCol(8);
 
-    int counter = 0;
     for(unsigned i = 0; i < vecSM_A.size(); ++i)
     {
         auto el = vecSM_A[i];
 
         el.setStatusCode(i == vecSM_A.size() - 1 ? 1 : 0);
+
+        ProcessCommunicator::send(communicationDataSend[procRank], el);
+        ProcessCommunicator::recv(communicationDataRecv[procRank]);
+    }
+
+
+    for (unsigned i = 0; i < vecSM_B.size(); ++i)
+    {
+        auto el = vecSM_B[i];
+
+        el.setStatusCode(i == vecSM_B.size() - 1 ? 1 : 0);
 
         ProcessCommunicator::send(communicationDataSend[procRank], el);
         ProcessCommunicator::recv(communicationDataRecv[procRank]);
@@ -364,22 +374,39 @@ void jobRank0(int procRank)
 void jobRankN(int procRank)
 {
     unsigned status = 0;
-//    SharedMatrix ma;
+    SharedMatrix ma;
+    SharedMatrix mb;
 
+    // recv ma;
     while (status == 0)
     {
         auto matrix = ProcessCommunicator::recv(communicationDataRecv[procRank]);
 
-        if (matrix.flag() == procRank)
+        if (matrix.flag() == procRank-1)
         {
-            std::cout << "Recv" << " [" << matrix.flag() << "] " << matrix.rows() << "|" << matrix.cols() << std::endl;
+            ma = matrix;
         }
 
         ProcessCommunicator::send(communicationDataSend[procRank], matrix);
         status = matrix.statusCode();
     }
 
+    status = 0;
+    while (status == 0)
+    {
+        auto matrix = ProcessCommunicator::recv(communicationDataRecv[procRank]);
 
+        if (matrix.flag() == procRank-1)
+        {
+            mb = matrix;
+        }
+
+        ProcessCommunicator::send(communicationDataSend[procRank], matrix);
+        status = matrix.statusCode();
+    }
+
+    std::cout << procRank << "-ma " << " [" << ma.flag() << "] " << ma.rows() << "|" << ma.cols() << std::endl;
+    std::cout << procRank << "-mb " << " [" << mb.flag() << "] " << mb.rows() << "|" << mb.cols() << std::endl;
 }
 
 
