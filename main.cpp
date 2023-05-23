@@ -3,13 +3,27 @@
 #include <iomanip>
 #include <vector>
 #include <map>
+#include <mpi.h>
 
 class SharedMatrix;
 
 typedef long double CalVar;
 typedef std::vector<CalVar> TVector;
 typedef std::vector<TVector> TMatrix;
-typedef std::vector<SharedMatrix> SMList;
+typedef std::vector<SharedMatrix> SMVec;
+
+
+// 7 -> 4 -> 8 -> 6 -> 2 -> 1 -> 3 -> 5
+std::map<int, int> communicationData {
+        {7, 4},
+        {4, 8},
+        {8, 6},
+        {6, 2},
+        {2, 1},
+        {1, 3},
+        {3, 5},
+        {5, 7}
+};
 
 
 class SharedMatrix
@@ -116,7 +130,7 @@ public:
         return true;
     }
 
-    SMList splitIntoMatricesRow(int parts)
+    SMVec splitIntoMatricesRow(int parts)
     {
         std::vector<SharedMatrix> result;
 
@@ -142,7 +156,7 @@ public:
         return result;
     }
 
-    SMList splitIntoMatricesCol(int parts)
+    SMVec splitIntoMatricesCol(int parts)
     {
         std::vector<SharedMatrix> result;
 
@@ -210,7 +224,7 @@ void mulMatrices(Matrix &result, Matrix &matrixA, Matrix &matrixB)
 }
 
 
-int main()
+void jobRank1()
 {
     Matrix matrixA(60, 248);
     Matrix matrixB(248, 149);
@@ -218,32 +232,23 @@ int main()
     genMatrix(matrixA);
     genMatrix(matrixB);
 
-    // 7 -> 4 -> 8 -> 6 -> 2 -> 1 -> 3 -> 5
-    std::map<int, int> communicationData {
-        {7, 4},
-        {4, 8},
-        {8, 6},
-        {6, 2},
-        {2, 1},
-        {1, 3},
-        {3, 5},
-        {5, 7}
-    };
+    auto vecSM_A = matrixA.splitIntoMatricesRow(8);
+    auto vecSM_B = matrixB.splitIntoMatricesCol(8);
+}
 
-    auto vec = matrixA.splitIntoMatricesRow(8);
 
-    for (auto &el: vec)
-    {
-        std::cout << el.flag() << " " << el.rows() << "|" << el.cols() << std::endl;
-    }
+void jobRankN()
+{
+//    for ()
+}
 
-    std::cout << std::endl;
 
-    auto vec2 = matrixB.splitIntoMatricesCol(8);
-    for (auto &el: vec2)
-    {
-        std::cout << el.flag() << " " << el.rows() << "|" << el.cols() << std::endl;
-    }
+int main(int argc, char* argv[])
+{
+    int procRank;
+
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &procRank);
 
     return 0;
 }
