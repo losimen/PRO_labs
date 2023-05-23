@@ -33,6 +33,7 @@ private:
     unsigned _rows;
     unsigned _cols;
     unsigned _flag;
+    unsigned _statusCode = 0;
 
 public:
     SharedMatrix()
@@ -73,16 +74,27 @@ public:
         return _flag;
     }
 
-    CalVar *data()
+    unsigned statusCode()
     {
-        // flag + rows + cols + matrix
-        CalVar *result = new CalVar[3+(_rows * _cols)];
+        return _statusCode;
+    }
 
-        result[0] = _flag;
-        result[1] = _rows;
-        result[2] = _cols;
+    void setStatusCode(unsigned statusCode)
+    {
+        this->_statusCode = statusCode;
+    }
 
-        int index = 3;
+    CalVar *serializeData()
+    {
+        // status + flag + rows + cols + matrix
+        CalVar *result = new CalVar[4+(_rows * _cols)];
+
+        result[0] = _statusCode;
+        result[1] = _flag;
+        result[2] = _rows;
+        result[3] = _cols;
+
+        int index = 4;
         for(int i = 0; i < _rows; i++)
             for(int j = 0; j < _cols; j++)
                 result[index++] = _matrix[i][j];
@@ -90,17 +102,18 @@ public:
         return result;
     }
 
-    void data(CalVar *data)
+    void parseData(CalVar *data)
     {
-        _flag = data[0];
-        _rows = data[1];
-        _cols = data[2];
+        _statusCode = data[0];
+        _flag = data[1];
+        _rows = data[2];
+        _cols = data[3];
 
         _matrix.resize(_rows);
         for(int i = 0; i < _rows; i++)
             _matrix[i].resize(_cols);
 
-        int index = 3;
+        int index = 4;
         for(int i = 0; i < _rows; i++)
             for(int j = 0; j < _cols; j++)
                 _matrix[i][j] = data[index++];
@@ -248,9 +261,11 @@ public:
         this->_currentRank = currentRank;
     }
 
-    void send(int rankToSend, CalVar *data)
+    void send(int rankToSend, SharedMatrix &matrix)
     {
-        const int size = 3 + (data[1] * data[2]);
+        auto data = matrix.serializeData();
+        const int size = 4 + (data[2] * data[3]);
+
         MPI_Send(data, size, MPI_DOUBLE, rankToSend, 0, MPI_COMM_WORLD);
 
         delete[] data;
@@ -268,7 +283,7 @@ public:
         MPI_Recv(data, size, MPI_DOUBLE, recvFrom, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
         SharedMatrix matrix;
-        matrix.data(data);
+        matrix.parseData(data);
 
         delete[] data;
 
@@ -352,15 +367,16 @@ int main(int argc, char* argv[])
         SMVec shared = matrixA.splitIntoMatricesRow(2);
 
         std::cout << "Send [" << shared[1].flag() << "] " << shared[1].rows() << "|" << shared[1].cols() << " " << std::endl;
+        shared[1].setStatusCode(5);
         shared[1].print();
-        comm.send(1, shared[1].data());
+        comm.send(1, shared[1]);
     }
     else if (procRank == 1)
     {
         ProcessCommunicator comm(procRank);
         auto matrix = comm.recv(0);
 
-        std::cout << std::endl << "Recv [" << matrix.flag() << "] " << matrix.rows() << "|" << matrix.cols() << " " << std::endl;
+        std::cout << std::endl << matrix.statusCode() << " - Recv [" << matrix.flag() << "] " << matrix.rows() << "|" << matrix.cols() << " " << std::endl;
         matrix.print();
     }
 
