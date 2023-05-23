@@ -35,6 +35,13 @@ private:
     unsigned _flag;
 
 public:
+    SharedMatrix()
+    {
+        this->_rows = 0;
+        this->_cols = 0;
+        this->_flag = 0;
+    }
+
     SharedMatrix(unsigned rows, unsigned cols, unsigned flag)
     {
         this->_rows = rows;
@@ -64,6 +71,39 @@ public:
     unsigned flag()
     {
         return _flag;
+    }
+
+    CalVar *data()
+    {
+        // flag + rows + cols + matrix
+        CalVar *result = new CalVar[3+(_rows * _cols)];
+
+        result[0] = _flag;
+        result[1] = _rows;
+        result[2] = _cols;
+
+        int index = 1;
+        for(int i = 0; i < _rows; i++)
+            for(int j = 0; j < _cols; j++)
+                result[index++] = _matrix[i][j];
+
+        return result;
+    }
+
+    void setData(CalVar *data)
+    {
+        _flag = data[0];
+        _rows = data[1];
+        _cols = data[2];
+
+        _matrix.resize(_rows);
+        for(int i = 0; i < _rows; i++)
+            _matrix[i].resize(_cols);
+
+        int index = 3;
+        for(int i = 0; i < _rows; i++)
+            for(int j = 0; j < _cols; j++)
+                _matrix[i][j] = data[index++];
     }
 };
 
@@ -180,6 +220,33 @@ public:
         }
 
         return result;
+    }
+};
+
+
+class ProcessCommunicator
+{
+private:
+    int _currentRank;
+    int _nextRank;
+
+public:
+    ProcessCommunicator(int currentRank)
+    {
+        this->_currentRank = currentRank;
+        this->_nextRank = communicationData[currentRank];
+    }
+
+    void send(int rankToSend, CalVar *data)
+    {
+        const int size = 3 + (data[1] * data[2]);
+        MPI_Send(data, size, MPI_DOUBLE, rankToSend, 0, MPI_COMM_WORLD);
+    }
+
+    void recv(int recvFrom)
+    {
+
+        MPI_Recv(data, size, MPI_DOUBLE, recvFrom, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
 };
 
