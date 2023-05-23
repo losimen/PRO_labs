@@ -14,7 +14,7 @@ typedef std::vector<SharedMatrix> SMVec;
 
 
 // 7 -> 4 -> 8 -> 6 -> 2 -> 1 -> 3 -> 5
-std::map<int, int> communicationData {
+std::map<int, int> communicationDataSend {
         {7, 4},
         {4, 8},
         {8, 6},
@@ -22,7 +22,20 @@ std::map<int, int> communicationData {
         {2, 1},
         {1, 3},
         {3, 5},
-        {5, 7}
+        {5, 0},
+        {0, 7}
+};
+
+std::map<int, int> communicationDataRecv {
+        {0, 5},
+        {7, 0},
+        {4, 7},
+        {8, 4},
+        {6, 8},
+        {2, 6},
+        {1, 2},
+        {3, 1},
+        {5, 3}
 };
 
 
@@ -252,16 +265,8 @@ public:
 
 class ProcessCommunicator
 {
-private:
-    int _currentRank;
-
 public:
-    ProcessCommunicator(int currentRank)
-    {
-        this->_currentRank = currentRank;
-    }
-
-    void send(int rankToSend, SharedMatrix &matrix)
+    static void send(int rankToSend, SharedMatrix &matrix)
     {
         auto data = matrix.serializeData();
         const int size = 4 + (data[2] * data[3]);
@@ -271,7 +276,7 @@ public:
         delete[] data;
     }
 
-    SharedMatrix recv(int recvFrom)
+    static SharedMatrix recv(int recvFrom = MPI_ANY_SOURCE)
     {
         MPI_Status status;
         MPI_Probe(recvFrom, 0, MPI_COMM_WORLD, &status);
@@ -332,7 +337,7 @@ void mulMatrices(Matrix &result, Matrix &matrixA, Matrix &matrixB)
 }
 
 
-void jobRank1()
+void jobRank0(int procRank)
 {
     Matrix matrixA(60, 248);
     Matrix matrixB(248, 149);
@@ -341,13 +346,40 @@ void jobRank1()
     genMatrix(matrixB);
 
     auto vecSM_A = matrixA.splitIntoMatricesRow(8);
-    auto vecSM_B = matrixB.splitIntoMatricesCol(8);
+//    auto vecSM_B = matrixB.splitIntoMatricesCol(8);
+
+    int counter = 0;
+    for(unsigned i = 0; i < vecSM_A.size(); ++i)
+    {
+        auto el = vecSM_A[i];
+
+        el.setStatusCode(i == vecSM_A.size() - 1 ? 1 : 0);
+
+        ProcessCommunicator::send(communicationDataSend[procRank], el);
+        ProcessCommunicator::recv(communicationDataRecv[procRank]);
+    }
 }
 
 
-void jobRankN()
+void jobRankN(int procRank)
 {
-//    for ()
+    unsigned status = 0;
+//    SharedMatrix ma;
+
+    while (status == 0)
+    {
+        auto matrix = ProcessCommunicator::recv(communicationDataRecv[procRank]);
+
+        if (matrix.flag() == procRank)
+        {
+            std::cout << "Recv" << " [" << matrix.flag() << "] " << matrix.rows() << "|" << matrix.cols() << std::endl;
+        }
+
+        ProcessCommunicator::send(communicationDataSend[procRank], matrix);
+        status = matrix.statusCode();
+    }
+
+
 }
 
 
@@ -360,24 +392,11 @@ int main(int argc, char* argv[])
 
     if (procRank == 0)
     {
-        Matrix matrixA(60, 3);
-        genMatrix(matrixA);
-        ProcessCommunicator comm(procRank);
-
-        SMVec shared = matrixA.splitIntoMatricesRow(2);
-
-        std::cout << "Send [" << shared[1].flag() << "] " << shared[1].rows() << "|" << shared[1].cols() << " " << std::endl;
-        shared[1].setStatusCode(5);
-        shared[1].print();
-        comm.send(1, shared[1]);
+        jobRank0(procRank);
     }
-    else if (procRank == 1)
+    else
     {
-        ProcessCommunicator comm(procRank);
-        auto matrix = comm.recv(0);
-
-        std::cout << std::endl << matrix.statusCode() << " - Recv [" << matrix.flag() << "] " << matrix.rows() << "|" << matrix.cols() << " " << std::endl;
-        matrix.print();
+        jobRankN(procRank);
     }
 
     MPI_Finalize();
