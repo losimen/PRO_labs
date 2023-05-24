@@ -462,20 +462,27 @@ void jobRank0(int procRank)
         {
             auto matrix = ProcessCommunicator::recv(j);
 
-            unsigned a = matrix.flag();
-            unsigned b = matrix.statusCode();
+            unsigned vec_a = matrix.flag();
+            unsigned vec_b = matrix.statusCode();
 
-            resultP.insertBlock(matrix, a*7, b*7);
+            unsigned row = 0;
+            unsigned col = 0;
+
+            for (unsigned k = 0; k < vec_a; ++k)
+                row += vecSM_A[k].rows();
+
+            for (unsigned k = 0; k < vec_b; ++k)
+                col += vecSM_B[k].cols();
+
+            resultP.insertBlock(matrix, row, col);
 
             for (unsigned k = 1; k <= 8; ++k)
-            {
                 ProcessCommunicator::send(k, zero);
-            }
         }
     }
 
-    std::cout << "Result: " << std::endl;
     mulMatrices(resultS, matrixA, matrixB);
+    std::cout << "Result: " << resultP.compare(resultS) << std::endl;
 
     resultP.writeToFile("resultP.txt");
     resultS.writeToFile("resultS.txt");
@@ -525,7 +532,7 @@ void jobRankN(int procRank)
         ProcessCommunicator::send(0, result);
         auto zero = ProcessCommunicator::recv(0);
 
-        if (procRank == 8)
+        if (procRank == 7)
         {
             mb = ProcessCommunicator::recv(communicationMulRecv[procRank]);
             ProcessCommunicator::send(communicationMulSend[procRank], mb);
