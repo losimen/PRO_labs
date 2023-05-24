@@ -477,7 +477,7 @@ void jobRank0(int procRank)
     std::cout << "Result: " << std::endl;
     mulMatrices(resultS, matrixA, matrixB);
 
-//    resultP.writeToFile("resultP.txt");
+    resultP.writeToFile("resultP.txt");
     resultS.writeToFile("resultS.txt");
 }
 
