@@ -4,6 +4,8 @@
 #include <vector>
 #include <map>
 #include <mpi.h>
+#include <thread>
+#include <chrono>
 
 class SharedMatrix;
 
@@ -14,6 +16,30 @@ typedef std::vector<SharedMatrix> SMVec;
 
 
 // 7 -> 4 -> 8 -> 6 -> 2 -> 1 -> 3 -> 5
+std::map<int, int> communicationMulSend {
+        {7, 4},
+        {4, 8},
+        {8, 6},
+        {6, 2},
+        {2, 1},
+        {1, 3},
+        {3, 5},
+        {5, 7}
+};
+
+
+std::map<int, int> communicationMulRecv {
+        {7, 5},
+        {4, 7},
+        {8, 4},
+        {6, 8},
+        {2, 6},
+        {1, 2},
+        {3, 1},
+        {5, 3}
+};
+
+
 std::map<int, int> communicationDataSend {
         {7, 4},
         {4, 8},
@@ -37,6 +63,9 @@ std::map<int, int> communicationDataRecv {
         {3, 1},
         {5, 3}
 };
+
+
+
 
 
 class SharedMatrix
@@ -282,7 +311,7 @@ public:
     static void send(int rankToSend, SharedMatrix &matrix)
     {
         auto data = matrix.serializeData();
-        const int size = 4 + (data[2] * data[3]);
+        const int size = 4 + (matrix.rows() * matrix.cols());
 
         MPI_Send(data, size, MPI_DOUBLE, rankToSend, 0, MPI_COMM_WORLD);
 
@@ -356,6 +385,9 @@ void mulSharedMatrices(SharedMatrix &result, SharedMatrix &matrixA, SharedMatrix
     auto &m_matrixB = matrixB.matrix();
     auto &m_result = result.matrix();
 
+    if (matrixA.cols() != matrixB.rows())
+        throw std::runtime_error("Matrix A cols != Matrix B rows");
+
     for(int i = 0; i < matrixA.rows(); i++)
     {
         for(int j = 0; j < matrixB.cols(); j++)
@@ -407,14 +439,17 @@ void jobRank0(int procRank)
     {
         for (unsigned j = 0; j < 8; ++j)
         {
-            auto matrix = ProcessCommunicator::recv(communicationDataRecv[procRank]);
+            auto matrix = ProcessCommunicator::recv();
 
             unsigned a = matrix.flag();
             unsigned b = matrix.statusCode();
+            std::cout << "a: " << a << " b: " << b << std::endl;
 
-            resultP.insertBlock(matrix, a*60, b*149);
+//            resultP.insertBlock(matrix, a*60, b*149);
+//            resultP.insertBlock(matrix, a*8, b*8);
+            std::this_thread::sleep_for(std::chrono::seconds(5));
+            ProcessCommunicator::send(a+1, matrix);
         }
-
 
         auto matrix = ProcessCommunicator::recv(communicationDataRecv[procRank]);
         ProcessCommunicator::send(communicationDataSend[procRank], matrix);
@@ -458,11 +493,13 @@ void jobRankN(int procRank)
 
     for (unsigned i = 0; i < 8; ++i)
     {
-        auto result = SharedMatrix(ma.rows(), mb.cols(), procRank);
+        auto result = SharedMatrix(ma.rows(), mb.cols(), procRank-1);
         result.setStatusCode(mb.flag());
         mulSharedMatrices(result, ma, mb);
 
         ProcessCommunicator::send(0, result);
+        ProcessCommunicator::recv(0);
+
         ProcessCommunicator::send(communicationDataSend[procRank], mb);
         mb = ProcessCommunicator::recv(communicationDataRecv[procRank]);
     }
