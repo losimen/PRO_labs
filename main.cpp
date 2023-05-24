@@ -484,11 +484,11 @@ void jobRank0(int procRank)
 
 void jobRankN(int procRank)
 {
-    unsigned status = 0;
+    unsigned status;
     SharedMatrix ma;
     SharedMatrix mb;
 
-    // recv ma;
+    status = 0;
     while (status == 0)
     {
         auto matrix = ProcessCommunicator::recv(communicationDataRecv[procRank]);
@@ -522,10 +522,8 @@ void jobRankN(int procRank)
         result.setStatusCode(mb.flag());
         mulSharedMatrices(result, ma, mb);
 
-//        std::cout << procRank << "-result " << result.flag() << " " << result.rows() << "|" << result.cols() << std::endl;
         ProcessCommunicator::send(0, result);
         auto zero = ProcessCommunicator::recv(0);
-//        std::cout << procRank << "-sent " << zero.flag() << " " << zero.rows() << "|" << zero.cols() << std::endl;
 
         if (procRank == 8)
         {
