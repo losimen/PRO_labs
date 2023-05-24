@@ -463,14 +463,6 @@ void jobRank0(int procRank)
             unsigned row = 0;
             unsigned col = 0;
 
-            if (vec_b == 6)
-            {
-//                std::cout << "vec_a == 0" << std::endl;
-//                std::cout << matrix.rows() << " " << matrix.cols() << std::endl;
-//                matrix.print();
-//                std::cout << std::endl;
-            }
-
             for (unsigned k = 0; k < vec_a; ++k)
                 row += vecSM_A[k].rows();
 
