@@ -253,7 +253,11 @@ public:
                 colsLeft--;
             }
 
-            result.push_back(SharedMatrix(_rows, end - start, i));
+            auto newM = SharedMatrix(_rows, end - start, i);
+            for(int j = 0; j < _rows; j++)
+                newM.matrix()[j] = TVector(_matrix[j].begin() + start, _matrix[j].begin() + end);
+            result.push_back(newM);
+
             start = end;
             end += colsPerPart;
         }
