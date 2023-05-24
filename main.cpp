@@ -4,8 +4,6 @@
 #include <vector>
 #include <map>
 #include <mpi.h>
-#include <thread>
-#include <chrono>
 #include <fstream>
 
 class SharedMatrix;
@@ -64,9 +62,6 @@ std::map<int, int> communicationDataRecv {
         {3, 1},
         {5, 3}
 };
-
-
-
 
 
 class SharedMatrix
