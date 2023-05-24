@@ -6,6 +6,7 @@
 #include <mpi.h>
 #include <thread>
 #include <chrono>
+#include <fstream>
 
 class SharedMatrix;
 
@@ -302,6 +303,22 @@ public:
             for(int j = 0; j < block.cols(); j++)
                 _matrix[row + i][col + j] = blockMatrix[i][j];
     }
+
+    void writeToFile(std::string fileName)
+    {
+        std::ofstream file(fileName);
+
+        file << _rows << " " << _cols << std::endl;
+
+        for(int i = 0; i < _rows; i++)
+        {
+            for(int j = 0; j < _cols; j++)
+                file << _matrix[i][j] << " ";
+            file << std::endl;
+        }
+
+        file.close();
+    }
 };
 
 
@@ -313,7 +330,7 @@ public:
         auto data = matrix.serializeData();
         const int size = 4 + (matrix.rows() * matrix.cols());
 
-        MPI_Send(data, size, MPI_DOUBLE, rankToSend, 0, MPI_COMM_WORLD);
+        MPI_Send(data, size, MPI_LONG_DOUBLE, rankToSend, 0, MPI_COMM_WORLD);
 
         delete[] data;
     }
@@ -324,10 +341,10 @@ public:
         MPI_Probe(recvFrom, 0, MPI_COMM_WORLD, &status);
 
         int size;
-        MPI_Get_count(&status, MPI_DOUBLE, &size);
+        MPI_Get_count(&status, MPI_LONG_DOUBLE, &size);
 
         CalVar *data = new CalVar[size];
-        MPI_Recv(data, size, MPI_DOUBLE, recvFrom, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Recv(data, size, MPI_LONG_DOUBLE, recvFrom, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
         SharedMatrix matrix;
         matrix.parseData(data);
@@ -406,7 +423,12 @@ void jobRank0(int procRank)
 {
     Matrix matrixA(60, 248);
     Matrix matrixB(248, 149);
+
     Matrix resultP(60, 149);
+    Matrix resultS(60, 149);
+
+    SharedMatrix zero(0, 0, 15);
+    zero.setStatusCode(15);
 
     genMatrix(matrixA);
     genMatrix(matrixB);
@@ -424,7 +446,6 @@ void jobRank0(int procRank)
         ProcessCommunicator::recv(communicationDataRecv[procRank]);
     }
 
-
     for (unsigned i = 0; i < vecSM_B.size(); ++i)
     {
         auto el = vecSM_B[i];
@@ -437,23 +458,27 @@ void jobRank0(int procRank)
 
     for (unsigned i = 0; i < 8; ++i)
     {
-        for (unsigned j = 0; j < 8; ++j)
+        for (unsigned j = 1; j <= 8; ++j)
         {
-            auto matrix = ProcessCommunicator::recv();
+            auto matrix = ProcessCommunicator::recv(j);
 
             unsigned a = matrix.flag();
             unsigned b = matrix.statusCode();
-            std::cout << "a: " << a << " b: " << b << std::endl;
 
-//            resultP.insertBlock(matrix, a*60, b*149);
-//            resultP.insertBlock(matrix, a*8, b*8);
-            std::this_thread::sleep_for(std::chrono::seconds(5));
-            ProcessCommunicator::send(a+1, matrix);
+            resultP.insertBlock(matrix, a*7, b*7);
+
+            for (unsigned k = 1; k <= 8; ++k)
+            {
+                ProcessCommunicator::send(k, zero);
+            }
         }
-
-        auto matrix = ProcessCommunicator::recv(communicationDataRecv[procRank]);
-        ProcessCommunicator::send(communicationDataSend[procRank], matrix);
     }
+
+    std::cout << "Result: " << std::endl;
+    mulMatrices(resultS, matrixA, matrixB);
+
+    resultP.writeToFile("resultP.txt");
+    resultS.writeToFile("resultS.txt");
 }
 
 
@@ -497,11 +522,21 @@ void jobRankN(int procRank)
         result.setStatusCode(mb.flag());
         mulSharedMatrices(result, ma, mb);
 
+//        std::cout << procRank << "-result " << result.flag() << " " << result.rows() << "|" << result.cols() << std::endl;
         ProcessCommunicator::send(0, result);
-        ProcessCommunicator::recv(0);
+        auto zero = ProcessCommunicator::recv(0);
+//        std::cout << procRank << "-sent " << zero.flag() << " " << zero.rows() << "|" << zero.cols() << std::endl;
 
-        ProcessCommunicator::send(communicationDataSend[procRank], mb);
-        mb = ProcessCommunicator::recv(communicationDataRecv[procRank]);
+        if (procRank == 8)
+        {
+            mb = ProcessCommunicator::recv(communicationMulRecv[procRank]);
+            ProcessCommunicator::send(communicationMulSend[procRank], mb);
+        }
+        else
+        {
+            ProcessCommunicator::send(communicationMulSend[procRank], mb);
+            mb = ProcessCommunicator::recv(communicationMulRecv[procRank]);
+        }
     }
 }
 
