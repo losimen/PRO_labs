@@ -382,7 +382,7 @@ void mulMatrices(Matrix &result, Matrix &matrixA, Matrix &matrixB)
     auto m_matrixB = matrixB.matrix();
     auto &m_result = result.matrix();
 
-    for(int i = 0; i < matrixA.rows()-50; i++)
+    for(int i = 0; i < matrixA.rows(); i++)
     {
         for(int j = 0; j < matrixB.cols(); j++)
         {
@@ -477,7 +477,7 @@ void jobRank0(int procRank)
     std::cout << "Result: " << std::endl;
     mulMatrices(resultS, matrixA, matrixB);
 
-    resultP.writeToFile("resultP.txt");
+//    resultP.writeToFile("resultP.txt");
     resultS.writeToFile("resultS.txt");
 }
 
