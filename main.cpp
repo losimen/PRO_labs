@@ -264,6 +264,15 @@ public:
 
         return result;
     }
+
+    void insertBlock(SharedMatrix &block, int row, int col)
+    {
+        auto &blockMatrix = block.matrix();
+
+        for(int i = 0; i < block.rows(); i++)
+            for(int j = 0; j < block.cols(); j++)
+                _matrix[row + i][col + j] = blockMatrix[i][j];
+    }
 };
 
 
@@ -341,10 +350,31 @@ void mulMatrices(Matrix &result, Matrix &matrixA, Matrix &matrixB)
 }
 
 
+void mulSharedMatrices(SharedMatrix &result, SharedMatrix &matrixA, SharedMatrix &matrixB)
+{
+    auto &m_matrixA = matrixA.matrix();
+    auto &m_matrixB = matrixB.matrix();
+    auto &m_result = result.matrix();
+
+    for(int i = 0; i < matrixA.rows(); i++)
+    {
+        for(int j = 0; j < matrixB.cols(); j++)
+        {
+            m_result[i][j] = 0;
+            for(int k = 0; k < matrixA.cols(); k++)
+            {
+                m_result[i][j] += m_matrixA[i][k] * m_matrixB[k][j];
+            }
+        }
+    }
+}
+
+
 void jobRank0(int procRank)
 {
     Matrix matrixA(60, 248);
     Matrix matrixB(248, 149);
+    Matrix resultP(60, 149);
 
     genMatrix(matrixA);
     genMatrix(matrixB);
@@ -371,6 +401,23 @@ void jobRank0(int procRank)
 
         ProcessCommunicator::send(communicationDataSend[procRank], el);
         ProcessCommunicator::recv(communicationDataRecv[procRank]);
+    }
+
+    for (unsigned i = 0; i < 8; ++i)
+    {
+        for (unsigned j = 0; j < 8; ++j)
+        {
+            auto matrix = ProcessCommunicator::recv(communicationDataRecv[procRank]);
+
+            unsigned a = matrix.flag();
+            unsigned b = matrix.statusCode();
+
+            resultP.insertBlock(matrix, a*60, b*149);
+        }
+
+
+        auto matrix = ProcessCommunicator::recv(communicationDataRecv[procRank]);
+        ProcessCommunicator::send(communicationDataSend[procRank], matrix);
     }
 }
 
@@ -409,8 +456,16 @@ void jobRankN(int procRank)
         status = matrix.statusCode();
     }
 
-    std::cout << procRank << "-ma " << " [" << ma.flag() << "] " << ma.rows() << "|" << ma.cols() << std::endl;
-    std::cout << procRank << "-mb " << " [" << mb.flag() << "] " << mb.rows() << "|" << mb.cols() << std::endl;
+    for (unsigned i = 0; i < 8; ++i)
+    {
+        auto result = SharedMatrix(ma.rows(), mb.cols(), procRank);
+        result.setStatusCode(mb.flag());
+        mulSharedMatrices(result, ma, mb);
+
+        ProcessCommunicator::send(0, result);
+        ProcessCommunicator::send(communicationDataSend[procRank], mb);
+        mb = ProcessCommunicator::recv(communicationDataRecv[procRank]);
+    }
 }
 
 
