@@ -422,9 +422,6 @@ void jobRank0(int procRank)
     Matrix resultP(60, 149);
     Matrix resultS(60, 149);
 
-    SharedMatrix zero(0, 0, 15);
-    zero.setStatusCode(15);
-
     genMatrix(matrixA);
     genMatrix(matrixB);
 
@@ -470,9 +467,6 @@ void jobRank0(int procRank)
                 col += vecSM_B[k].cols();
 
             resultP.insertBlock(matrix, row, col);
-
-            for (unsigned k = 1; k <= 8; ++k)
-                ProcessCommunicator::send(k, zero);
         }
     }
 
@@ -525,7 +519,6 @@ void jobRankN(int procRank)
         mulSharedMatrices(result, ma, mb);
 
         ProcessCommunicator::send(0, result);
-        auto zero = ProcessCommunicator::recv(0);
 
         if (procRank == 7)
         {
